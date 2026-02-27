@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swift Link | Full-Stack Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased min-h-screen">
+    <div id="app" class="max-w-4xl mx-auto px-4 py-12">
+        
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-extrabold text-blue-600 mb-2">⚡ Swift Link</h1>
+            <p class="text-gray-500 font-medium">Enterprise-Grade URL Shortener & Analytics API</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 mb-10">
+            <form @submit.prevent="shortenUrl" class="flex flex-col md:flex-row gap-4">
+                <input v-model="inputUrl" type="url" required placeholder="Paste your long URL here (https://...)" 
+                       class="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                <button type="submit" :disabled="isLoading" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition-all disabled:opacity-50">
+                    {{ isLoading ? 'Shortening...' : 'Shorten URL' }}
+                </button>
+            </form>
+            
+            <div v-if="newLink" class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center animate-pulse">
+                <div>
+                    <p class="text-sm text-green-800 font-semibold mb-1">Success! Here is your short link:</p>
+                    <a :href="newLink" target="_blank" class="text-blue-600 font-bold hover:underline">{{ newLink }}</a>
+                </div>
+                <button @click="copyToClipboard(newLink)" class="bg-white px-3 py-1 text-sm font-bold border border-gray-300 rounded hover:bg-gray-100">Copy</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-gray-800">📊 Live Analytics Dashboard</h2>
+                <button @click="fetchAnalytics" class="text-sm text-blue-600 font-semibold hover:underline flex items-center gap-1">
+                    🔄 Refresh Data
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 border-b border-gray-200 text-sm uppercase tracking-wider text-gray-500">
+                            <th class="p-4 font-semibold">Short Link</th>
+                            <th class="p-4 font-semibold hidden md:table-cell">Original URL</th>
+                            <th class="p-4 font-semibold text-center">Total Clicks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-if="links.length === 0">
+                            <td colspan="3" class="p-8 text-center text-gray-400 font-medium">No links generated yet. Be the first!</td>
+                        </tr>
+                        <tr v-for="link in links" :key="link.short_id" class="border-b border-gray-100 hover:bg-gray-50 transition">
+                            <td class="p-4">
+                                <a :href="'/' + link.short_id" target="_blank" class="text-blue-600 font-bold hover:underline">
+                                    /{{ link.short_id }}
+                                </a>
+                                <p class="text-xs text-gray-400 mt-1">{{ link.created_at }}</p>
+                            </td>
+                            <td class="p-4 truncate max-w-xs hidden md:table-cell text-sm text-gray-600">{{ link.original_url }}</td>
+                            <td class="p-4 text-center">
+                                <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded-full font-bold text-sm">
+                                    {{ link.clicks }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    inputUrl: '',
+                    isLoading: false,
+                    newLink: null,
+                    links: [],
+                    baseUrl: window.location.origin
+                }
+            },
+            methods: {
+                async shortenUrl() {
+                    this.isLoading = true;
+                    try {
+                        const response = await fetch('/api/shorten', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ original_url: this.inputUrl })
+                        });
+                        const data = await response.json();
+                        if (response.ok) {
+                            this.newLink = `${this.baseUrl}/${data.short_id}`;
+                            this.inputUrl = '';
+                            this.fetchAnalytics(); // Update tabel otomatis
+                        } else {
+                            alert("Error: " + data.detail);
+                        }
+                    } catch (error) {
+                        console.error(error);
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                async fetchAnalytics() {
+                    try {
+                        const response = await fetch('/api/analytics');
+                        this.links = await response.json();
+                    } catch (error) {
+                        console.error(error);
+                    }
+                },
+                copyToClipboard(text) {
+                    navigator.clipboard.writeText(text);
+                    alert("Link copied!");
+                }
+            },
+            mounted() {
+                // Tarik data saat halaman pertama dimuat
+                this.fetchAnalytics();
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
